@@ -61,16 +61,3 @@ export function renderFormula(
     mathml,
   };
 }
-
-export function pngDimensions(width: number, height: number) {
-  if (!(width > 0 && height > 0) || !Number.isFinite(width + height))
-    throw new Error("Invalid image dimensions");
-  const scale = Math.min(
-    Math.max(3, 1200 / width),
-    8192 / Math.max(width, height),
-  );
-  return {
-    width: Math.max(1, Math.round(width * scale)),
-    height: Math.max(1, Math.round(height * scale)),
-  };
-}

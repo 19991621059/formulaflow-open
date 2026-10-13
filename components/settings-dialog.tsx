@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, LockKeyhole, Server, ExternalLink } from "lucide-react";
 import type { Settings } from "@/lib/types";
+import { settingsError } from "@/lib/settings";
 
 type Props = {
   open: boolean;
@@ -26,14 +27,22 @@ export function SettingsDialog({
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState(settings);
+  const [error, setError] = useState("");
   useEffect(() => {
     if (open) {
       setDraft(settings);
+      setError("");
       dialog.current?.showModal();
     } else dialog.current?.close();
   }, [open, settings]);
-  const update = (name: keyof Settings, value: string) =>
+  const update = (name: keyof Settings, value: string) => {
+    setError("");
     setDraft((previous) => ({ ...previous, [name]: value }));
+  };
+  const preset = (baseURL: string, model: string) => {
+    setError("");
+    setDraft((previous) => ({ ...previous, baseURL, model, apiKey: "" }));
+  };
   return (
     <dialog
       ref={dialog}
@@ -43,7 +52,6 @@ export function SettingsDialog({
     >
       <div className="dialog-heading">
         <div>
-          <span className="small-label">由你选择连接</span>
           <h2 id="settings-title">模型设置</h2>
         </div>
         <button
@@ -56,45 +64,23 @@ export function SettingsDialog({
         </button>
       </div>
       <p className="muted">
-        使用支持图片输入的 Chat Completions 兼容接口。图片和复核稿会发送到这里。
+        选择支持图片输入的模型。识别和复核时，图片与稿件会发送到所填接口。
       </p>
       <div className="presets" aria-label="配置模板">
         <button
           type="button"
           onClick={() =>
-            setDraft((previous) => ({
-              ...previous,
-              baseURL: "https://open.bigmodel.cn/api/paas/v4",
-              model: "glm-5.3-flash",
-              apiKey: "",
-            }))
+            preset("https://open.bigmodel.cn/api/paas/v4", "glm-5.3-flash")
           }
         >
           智谱模板
         </button>
-        <button
-          type="button"
-          onClick={() =>
-            setDraft((previous) => ({
-              ...previous,
-              baseURL: "",
-              model: "",
-              apiKey: "",
-            }))
-          }
-        >
+        <button type="button" onClick={() => preset("", "")}>
           自定义接口
         </button>
         <button
           type="button"
-          onClick={() =>
-            setDraft((previous) => ({
-              ...previous,
-              baseURL: "http://127.0.0.1:11434/v1",
-              model: "qwen3-vl:8b",
-              apiKey: "",
-            }))
-          }
+          onClick={() => preset("http://127.0.0.1:11434/v1", "qwen3-vl:8b")}
         >
           本地模型
         </button>
@@ -102,7 +88,17 @@ export function SettingsDialog({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          onSave(draft);
+          const problem = settingsError(draft, server.allowPrivate);
+          if (problem) {
+            setError(problem);
+            return;
+          }
+          onSave({
+            baseURL: draft.baseURL.trim(),
+            model: draft.model.trim(),
+            apiKey: draft.apiKey.trim(),
+            accessToken: draft.accessToken.trim(),
+          });
           onClose();
         }}
       >
@@ -155,13 +151,18 @@ export function SettingsDialog({
         {draft.baseURL.startsWith("http:") && !server.allowPrivate && (
           <p className="notice warning">
             <Server size={16} />
-            本地模型需在服务端启用 MODEL_ALLOW_PRIVATE_HOSTS，并重启助手。
+            此部署尚未允许本地模型。请按配置说明启用后重启。
           </p>
         )}
         <p className="privacy-note">
           <LockKeyhole size={16} />
           密钥不会写入浏览器存储。刷新页面后，临时配置、图片和稿件会清空。
         </p>
+        {error && (
+          <p className="notice warning" role="alert">
+            {error}
+          </p>
+        )}
         <div className="dialog-actions">
           <button
             type="button"
@@ -176,10 +177,10 @@ export function SettingsDialog({
               onClose();
             }}
           >
-            使用服务端配置
+            {server.configured ? "使用默认模型" : "清空模型设置"}
           </button>
           <button className="button primary" type="submit">
-            应用临时配置
+            应用设置
           </button>
         </div>
       </form>

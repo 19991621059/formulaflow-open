@@ -1,6 +1,6 @@
 {
-  "name": "formulaflow-open",
-  "version": "0.1.0",
+  "name": "formulaflow",
+  "version": "0.1.1",
   "private": true,
   "description": "Self-hosted document and formula assistant with your own vision API.",
   "license": "MIT",

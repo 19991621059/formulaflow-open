@@ -14,8 +14,9 @@ export async function POST(request: Request) {
     const checked = checkContent(input.content, input.mode);
     const format = input.format;
     if (
-      !["docx", "md", "tex", "mathml", "json"].includes(String(format)) ||
-      (input.mode === "document" && ["tex", "mathml"].includes(String(format)))
+      typeof format !== "string" ||
+      !["docx", "md", "tex", "mathml", "json"].includes(format) ||
+      (input.mode === "document" && ["tex", "mathml"].includes(format))
     )
       throw new AppError(
         "EXPORT_FORMAT",
@@ -68,10 +69,13 @@ export async function POST(request: Request) {
             : "text/plain; charset=utf-8";
     }
     const filename =
-      (typeof input.filename === "string" ? input.filename : "formulaflow")
-        .replace(/\.[^.]+$/, "")
-        .replace(/[^\p{L}\p{N}_ -]/gu, "_")
-        .slice(0, 80) || "formulaflow";
+      Array.from(
+        (typeof input.filename === "string" ? input.filename : "formulaflow")
+          .replace(/\.[^.]+$/, "")
+          .replace(/[^\p{L}\p{N}_ -]/gu, "_"),
+      )
+        .slice(0, 80)
+        .join("") || "formulaflow";
     return new Response(new Uint8Array(bytes).buffer, {
       headers: {
         "Content-Type": mime,

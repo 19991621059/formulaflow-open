@@ -17,8 +17,10 @@ export async function contentInput(request: Request) {
   }
   if (
     !input ||
+    typeof input !== "object" ||
+    Array.isArray(input) ||
     typeof input.content !== "string" ||
-    !["document", "formula"].includes(String(input.mode))
+    (input.mode !== "document" && input.mode !== "formula")
   )
     throw new AppError(
       "CONTENT_INVALID",

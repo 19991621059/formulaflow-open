@@ -4,6 +4,7 @@ import {
   isPrivateAddress,
   resolveAddresses,
   resolveConfig,
+  serverSummary,
 } from "../lib/server/config";
 import { assertAccess } from "../lib/server/guard";
 const fields = [
@@ -44,6 +45,44 @@ test("private, loopback, mapped IPv4 and metadata addresses are rejected", () =>
   assert.equal(isPrivateAddress("8.8.8.8"), false);
   assert.equal(isPrivateAddress("2606:4700:4700::1111"), false);
 });
+test("invalid model settings are rejected rather than interpreted as defaults", async () =>
+  isolated(() => {
+    process.env.MODEL_API_BASE_URL = "https://configured.example/v1";
+    process.env.MODEL_API_KEY = "unit-placeholder";
+    process.env.MODEL_NAME = "vision-example";
+    for (const input of [null, [], "invalid", 7, { baseURL: 7 }])
+      assert.throws(
+        () => resolveConfig(input),
+        (error) => (error as { code: string }).code === "CONFIG_INVALID",
+      );
+    assert.throws(
+      () =>
+        resolveConfig({
+          baseURL: "https://model.example/v1",
+          apiKey: "foo\r\nbar",
+          model: "vision",
+        }),
+      (error) => (error as { code: string }).code === "CONFIG_INVALID",
+    );
+  }));
+test("server configuration summaries never disclose embedded URL credentials", async () =>
+  isolated(() => {
+    process.env.MODEL_NAME = "vision-example";
+    process.env.MODEL_API_KEY = "unit-placeholder";
+    for (const base of [
+      "https://user:private-marker@model.example/v1",
+      "https://model.example/v1?key=private-marker",
+      "not-a-url",
+    ]) {
+      process.env.MODEL_API_BASE_URL = base;
+      const summary = serverSummary();
+      assert.equal(summary.configured, false);
+      assert.equal(summary.baseURL, "");
+      assert.doesNotMatch(JSON.stringify(summary), /private-marker/);
+    }
+    process.env.MODEL_API_BASE_URL = "https://model.example/v1";
+    assert.equal(serverSummary().configured, true);
+  }));
 test("browser-selected endpoints never receive the server credential", async () =>
   isolated(() => {
     process.env.MODEL_API_BASE_URL = "https://configured.example/v1";

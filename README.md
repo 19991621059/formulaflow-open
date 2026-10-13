@@ -1,8 +1,8 @@
-# FormulaFlow Open
+# FormulaFlow
 
 **接入自己的模型，把图片中的文字、表格和公式变成可编辑稿件。**
 
-基于 FormulaFlow 提取的开源文档与公式处理助手。可以独立运行，不需要账户、数据库或订阅服务。界面和文档以中文为主。
+文档与公式处理助手。接入自己的视觉模型，上传图片、核对和修正结果，再导出 Word、Markdown 或公式源码。
 
 ![工作台真实截图](docs/images/workspace.jpg)
 
@@ -35,7 +35,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)，点击右上角 **配置你的模型**，填写接口地址、API Key 和视觉模型名称。也可以编辑 `.env.local` 后重启，通过服务端配置使用。
+打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)，点击右上角 **模型设置**，填写接口地址、API Key 和视觉模型名称。也可以编辑 `.env.local` 后重启，使用默认模型配置。
 
 接口地址示例 `https://your-provider.example/v1`，助手会补上 `/chat/completions`。需要模型支持 `image_url` 图片输入和文本输出；纯文本模型无法识别图片。智谱、本地 Ollama 与自定义接口的示例见 [模型配置](docs/configuration.md)。模板中的模型名称需要与自己的供应商账户或本地安装匹配。
 
@@ -95,7 +95,7 @@ npm run check:secrets
 npm audit --omit=dev
 ```
 
-`test:e2e` 使用明确标记的本地测试模型接口，验证上传、阶段事件、编辑、复核、导出和错误处理。**它不证明真实 OCR。**
+`test:e2e` 使用固定返回值的本地测试接口，验证上传、编辑、复核、导出和异常处理。真实模型测试及本次修复结果见 [验收报告](docs/verification/acceptance.md)。
 
 真实模型检查需要先启动已配置的应用，再运行：
 

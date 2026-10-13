@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
+import { normalizeDocument } from "../lib/recognition-content";
+
+test("OCR normalization preserves code and blank lines while formatting real display math", () => {
+  const code =
+    "```text\n$$sample$$\n\n\nkeep blank lines\n```\n\nInline `$$code$$` is literal.";
+  assert.equal(normalizeDocument(code), code);
+  assert.equal(
+    normalizeDocument("前文 $$y^2$$ 后文"),
+    "前文 \n\n$$\ny^2\n$$\n\n 后文",
+  );
+  const twice = normalizeDocument("$$x^2$$\n\n$$y^2$$");
+  assert.equal(normalizeDocument(twice), twice);
+});
 import { checkContent, previewContent } from "../lib/server/content";
 import { createDocx } from "../lib/server/export-docx";
 

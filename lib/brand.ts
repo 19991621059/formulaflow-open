@@ -1,1 +1,1 @@
-export const BRAND_NAME = "FormulaFlow Open";
+export const BRAND_NAME = "FormulaFlow";

@@ -8,6 +8,7 @@ export type ProcessState = {
   stage: string;
   message: string;
   elapsedMs: number;
+  action?: "recognize" | "review";
   code?: string;
   hint?: string;
 };
@@ -25,10 +26,14 @@ export function useProcessor() {
     if (state.status !== "running") return;
     const timer = setInterval(
       () =>
-        setState((previous) => ({
-          ...previous,
-          elapsedMs: Date.now() - started.current,
-        })),
+        setState((previous) =>
+          previous.status !== "running"
+            ? previous
+            : {
+                ...previous,
+                elapsedMs: Date.now() - started.current,
+              },
+        ),
       1000,
     );
     return () => clearInterval(timer);
@@ -80,8 +85,9 @@ export function useProcessor() {
     started.current = Date.now();
     setState({
       status: "running",
+      action,
       stage: "upload",
-      message: "正在上传图片到助手服务器",
+      message: "正在上传图片",
       elapsedMs: 0,
     });
     try {
@@ -111,6 +117,7 @@ export function useProcessor() {
         if (id === generation.current)
           setState({
             status: "error",
+            action,
             stage: "",
             message: problem.message || "请求未完成",
             code: problem.code,
@@ -130,6 +137,7 @@ export function useProcessor() {
         if (event.type === "stage")
           setState({
             status: "running",
+            action,
             stage: event.stage,
             message: event.message,
             elapsedMs: event.elapsedMs,
@@ -139,6 +147,7 @@ export function useProcessor() {
           onResult(event);
           setState({
             status: "done",
+            action,
             stage: "complete",
             message:
               action === "review"
@@ -151,6 +160,7 @@ export function useProcessor() {
           completed = true;
           setState({
             status: "error",
+            action,
             stage: "",
             message: event.message,
             code: event.code,
@@ -179,6 +189,7 @@ export function useProcessor() {
       if (id !== generation.current || abort.signal.aborted) return;
       setState({
         status: "error",
+        action,
         stage: "",
         code: "NETWORK_INTERRUPTED",
         message: "连接中断，尚未收到完整结果。",

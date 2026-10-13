@@ -3,23 +3,19 @@ import { checkContent } from "@/lib/server/content";
 import { AppError, publicError } from "@/lib/server/errors";
 import { assertAccess, errorResponse, limitedBody } from "@/lib/server/guard";
 import { prepareImage, recognize } from "@/lib/server/model";
+import { createCapacity } from "@/lib/server/capacity";
 import type { Mode, ProcessEvent } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-let active = 0;
+const reserve = createCapacity(3);
 
 export async function POST(request: Request) {
+  let releaseRequest: (() => void) | undefined;
   try {
     assertAccess(request);
-    if (active >= 3)
-      throw new AppError(
-        "SERVER_BUSY",
-        "助手正在处理其他请求。",
-        "等待当前任务结束后重试。",
-        503,
-      );
+    releaseRequest = reserve();
     const bytes = await limitedBody(request, 9 * 1024 * 1024);
     const form = await new Response(bytes, {
       headers: { "Content-Type": request.headers.get("content-type") || "" },
@@ -45,9 +41,17 @@ export async function POST(request: Request) {
       (typeof rawSettings !== "string" || rawSettings.length > 8000)
     )
       throw new AppError("CONFIG_INVALID", "配置内容过长。", "检查模型设置。");
-    const config = resolveConfig(
-      rawSettings ? JSON.parse(rawSettings as string) : {},
-    );
+    let selected: unknown = {};
+    try {
+      if (rawSettings) selected = JSON.parse(rawSettings as string);
+    } catch {
+      throw new AppError(
+        "CONFIG_INVALID",
+        "模型配置格式无效。",
+        "请重新填写模型设置。",
+      );
+    }
+    const config = resolveConfig(selected);
     const action = form.get("action") || "recognize";
     if (action !== "recognize" && action !== "review")
       throw new AppError(
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
         "复核内容为空或过长。",
         "先识别或填写符合长度限制的稿件。",
       );
-    active++;
+    const release = releaseRequest;
     const start = Date.now(),
       abort = new AbortController(),
       encoder = new TextEncoder();
@@ -136,7 +140,7 @@ export async function POST(request: Request) {
           });
         } finally {
           clearInterval(heartbeat);
-          active--;
+          release();
           if (open)
             try {
               controller.close();
@@ -149,6 +153,7 @@ export async function POST(request: Request) {
         abort.abort();
       },
     });
+    releaseRequest = undefined;
     return new Response(stream, {
       headers: {
         "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -158,5 +163,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     return errorResponse(error);
+  } finally {
+    releaseRequest?.();
   }
 }

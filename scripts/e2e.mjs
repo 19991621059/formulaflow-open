@@ -65,6 +65,7 @@ const child = spawn(
       MODEL_NAME: "e2e-vision",
       MODEL_ALLOW_PRIVATE_HOSTS: "true",
       APP_ACCESS_TOKEN: access,
+      APP_PUBLIC_ORIGIN: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -84,11 +85,7 @@ const requestJson = (path, body) =>
     headers: { ...auth, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-async function processImage(
-  mode = "document",
-  action = "recognize",
-  draft = "",
-) {
+async function imageForm(mode = "document", action = "recognize", draft = "") {
   const form = new FormData();
   form.set(
     "image",
@@ -101,6 +98,14 @@ async function processImage(
   form.set("mode", mode);
   form.set("action", action);
   if (draft) form.set("draft", draft);
+  return form;
+}
+async function processImage(
+  mode = "document",
+  action = "recognize",
+  draft = "",
+) {
+  const form = await imageForm(mode, action, draft);
   const response = await fetch(base + "/api/process", {
     method: "POST",
     headers: auth,
@@ -232,6 +237,78 @@ try {
   });
   assert.equal(crossOrigin.status, 403);
   report.checks.push("cross-origin request rejection");
+  for (const body of [null, [], { content: "x^2", mode: ["formula"] }]) {
+    const invalid = await requestJson("/api/preview", body);
+    assert.equal(invalid.status, 400);
+  }
+  const badFormat = await requestJson("/api/export", {
+    content: "x^2",
+    mode: "formula",
+    format: ["json"],
+  });
+  assert.equal(badFormat.status, 400);
+  assert.equal((await badFormat.json()).code, "EXPORT_FORMAT");
+  report.checks.push("strict JSON shape, mode and export format validation");
+  const unicodeName = "a" + "𠀀".repeat(50);
+  const namedExport = await requestJson("/api/export", {
+    content: "x^2",
+    mode: "formula",
+    format: "md",
+    filename: unicodeName + ".png",
+  });
+  assert.equal(namedExport.status, 200);
+  assert.ok(
+    namedExport.headers
+      .get("content-disposition")
+      .includes(encodeURIComponent(unicodeName)),
+  );
+  report.checks.push("Unicode export filenames preserve complete code points");
+  const beforeConfig = calls;
+  for (const settings of [
+    "null",
+    "[]",
+    '"bad-settings"',
+    "{invalid",
+    '{"baseURL":7}',
+  ]) {
+    const form = await imageForm();
+    form.set("settings", settings);
+    const invalid = await fetch(base + "/api/process", {
+      method: "POST",
+      headers: auth,
+      body: form,
+    });
+    assert.equal(invalid.status, 400);
+    assert.equal((await invalid.json()).code, "CONFIG_INVALID");
+  }
+  assert.equal(calls, beforeConfig);
+  assert.equal((await processImage()).at(-1).type, "result");
+  report.checks.push(
+    "invalid settings never invoke the model or retain a capacity slot",
+  );
+  scenario = "slow";
+  const forms = await Promise.all(Array.from({ length: 6 }, () => imageForm()));
+  const parallel = await Promise.all(
+    forms.map(async (body) => {
+      const response = await fetch(base + "/api/process", {
+        method: "POST",
+        headers: auth,
+        body,
+      });
+      return { status: response.status, body: await response.text() };
+    }),
+  );
+  assert.equal(parallel.filter((item) => item.status === 200).length, 3);
+  const rejected = parallel.filter((item) => item.status === 503);
+  assert.equal(rejected.length, 3);
+  rejected.forEach((item) =>
+    assert.equal(JSON.parse(item.body).code, "SERVER_BUSY"),
+  );
+  scenario = "success";
+  assert.equal((await processImage()).at(-1).type, "result");
+  report.checks.push(
+    "concurrent admission limit and recovery after completion",
+  );
   await mkdir(new URL("outputs/", root), { recursive: true });
   await writeFile(
     new URL("outputs/e2e-report.json", root),

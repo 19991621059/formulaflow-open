@@ -78,6 +78,19 @@ test("model adapter maps failures safely and parses compatible content", async (
     );
   try {
     assert.equal((await call()).content, "\\frac{1}{2}");
+    for (const invalid of [null, [], "upstream-body-marker"]) {
+      payload = invalid;
+      await assert.rejects(
+        call,
+        (error) =>
+          (error as { code: string }).code === "MODEL_INVALID_RESPONSE",
+      );
+    }
+    payload = { choices: [{ message: { content: "$$ $$" } }] };
+    await assert.rejects(
+      call,
+      (error) => (error as { code: string }).code === "MODEL_EMPTY",
+    );
     status = 401;
     payload = { error: { message: "private-provider-body-marker" } };
     await assert.rejects(call, (error) => {

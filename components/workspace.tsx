@@ -27,6 +27,8 @@ import {
 import { SettingsDialog } from "./settings-dialog";
 import { useProcessor } from "./use-processor";
 import type { Issue, Mode, Settings } from "@/lib/types";
+import { BRAND_NAME } from "@/lib/brand";
+import { hasCustomModel, modelConfigured } from "@/lib/settings";
 
 const steps = [
   { id: "validate", label: "上传检查" },
@@ -87,18 +89,18 @@ export function Workspace() {
   const [dragging, setDragging] = useState(false),
     [modelUsed, setModelUsed] = useState("");
   const [imageOpen, setImageOpen] = useState(false);
+  const [loadingExample, setLoadingExample] = useState(false);
+  const exampleRequest = useRef(0);
+  const interactionLocked = useRef(false);
   const imageDialog = useRef<HTMLDialogElement>(null);
   const fileInput = useRef<HTMLInputElement>(null),
     proposalDialog = useRef<HTMLDialogElement>(null);
   const { state, run, cancel, reset, finishMessage } = useProcessor();
   const busy = state.status === "running",
-    configured =
-      !!(
-        settings.baseURL &&
-        settings.model &&
-        (settings.apiKey || server.allowPrivate)
-      ) || server.configured;
-  const hasCustom = !!(settings.baseURL || settings.model || settings.apiKey);
+    configured = modelConfigured(settings, server);
+  const hasCustom = hasCustomModel(settings);
+  const locked = busy || exporting || loadingExample;
+  interactionLocked.current = busy || exporting;
 
   useEffect(() => {
     const abort = new AbortController();
@@ -111,6 +113,7 @@ export function Workspace() {
     })
       .then(async (response) => {
         const data = await response.json();
+        if (abort.signal.aborted) return;
         if (response.ok) setServer(data);
         else
           setServer({
@@ -121,7 +124,15 @@ export function Workspace() {
             locked: response.status === 401,
           });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!abort.signal.aborted)
+          setServer({
+            configured: false,
+            model: "",
+            baseURL: "",
+            allowPrivate: false,
+          });
+      });
     return () => abort.abort();
   }, [settings.accessToken]);
   useEffect(() => {
@@ -151,6 +162,7 @@ export function Workspace() {
       })
         .then(async (response) => {
           const data = await response.json();
+          if (abort.signal.aborted) return;
           if (!response.ok) throw new Error(data.message);
           setPreview(data);
           setPreviewError("");
@@ -182,7 +194,7 @@ export function Workspace() {
   }, [mode, format]);
 
   function chooseFile(next: File) {
-    if (busy) return false;
+    if (interactionLocked.current) return false;
     if (!["image/png", "image/jpeg", "image/webp"].includes(next.type)) {
       setFeedback("仅支持 PNG、JPG 和 WebP 图片。PDF 请先导出为图片。");
       return false;
@@ -196,11 +208,15 @@ export function Workspace() {
       !window.confirm("更换图片会清空当前稿件。请先导出需要保留的内容。")
     )
       return false;
+    exampleRequest.current++;
+    setLoadingExample(false);
     reset();
     setFile(next);
     setContent("");
     setOriginal("");
     setProposal(null);
+    setProposalOpen(false);
+    setImageOpen(false);
     setFeedback("");
     setModelUsed("");
     return true;
@@ -210,11 +226,14 @@ export function Workspace() {
     event.target.value = "";
   }
   async function loadExample(kind: Mode) {
-    if (busy) return;
+    if (interactionLocked.current || loadingExample) return;
+    const id = ++exampleRequest.current;
+    setLoadingExample(true);
     try {
       const response = await fetch(`/examples/${kind}.png`);
       if (!response.ok) throw new Error("Sample missing");
       const blob = await response.blob();
+      if (id !== exampleRequest.current || interactionLocked.current) return;
       if (
         chooseFile(
           new File(
@@ -226,14 +245,17 @@ export function Workspace() {
       )
         setMode(kind);
     } catch {
-      setFeedback("示例图片暂时无法加载，请上传自己的图片。");
+      if (id === exampleRequest.current)
+        setFeedback("示例图片暂时无法加载，请上传自己的图片。");
+    } finally {
+      if (id === exampleRequest.current) setLoadingExample(false);
     }
   }
   function process(action: "recognize" | "review") {
-    if (!file || busy) return;
+    if (!file || locked) return;
     if (!configured || server.locked) {
       setSettingsOpen(true);
-      setFeedback("先填写可用的模型连接，再开始识别。");
+      setFeedback("请先完成模型设置和访问口令。");
       return;
     }
     if (
@@ -244,6 +266,7 @@ export function Workspace() {
       return;
     setFeedback("");
     setProposal(null);
+    interactionLocked.current = true;
     void run(file, mode, settings, action, content, (event) => {
       setModelUsed(event.model);
       if (action === "review") setProposal(event.content);
@@ -255,7 +278,8 @@ export function Workspace() {
     });
   }
   async function download() {
-    if (!content.trim() || exporting) return;
+    if (!content.trim() || locked) return;
+    interactionLocked.current = true;
     setExporting(true);
     setFeedback("");
     try {
@@ -323,13 +347,15 @@ export function Workspace() {
       }}
     >
       <header className="site-header">
-        <a className="brand" href="/" aria-label="FormulaFlow Open 首页">
+        <a
+          className="brand"
+          href="#workspace"
+          aria-label={`${BRAND_NAME} 工作台`}
+        >
           <span className="brand-icon">
             <Sigma size={24} strokeWidth={2.2} />
           </span>
-          <span>
-            FormulaFlow <span className="brand-open">Open</span>
-          </span>
+          <span>{BRAND_NAME}</span>
         </a>
         <nav aria-label="主导航">
           <a className="nav-selected" href="#workspace">
@@ -343,16 +369,22 @@ export function Workspace() {
             使用指南
           </a>
         </nav>
-        <button className="config-button" onClick={() => setSettingsOpen(true)}>
+        <button
+          className="config-button"
+          onClick={() => setSettingsOpen(true)}
+          disabled={locked}
+        >
           <span className={`status-dot ${configured ? "ready" : ""}`} />
           <span>
             {server.locked
               ? "需要访问口令"
               : hasCustom
-                ? "临时模型配置"
+                ? configured
+                  ? "模型已配置"
+                  : "完成模型设置"
                 : server.configured
-                  ? "服务端已配置"
-                  : "配置你的模型"}
+                  ? "模型已配置"
+                  : "模型设置"}
           </span>
           <Settings2 size={17} />
         </button>
@@ -360,12 +392,8 @@ export function Workspace() {
       <main>
         <div className="intro">
           <div>
-            <div className="intro-caption">
-              <span className="open-tag">开源 · 自部署</span>
-              <span>图片里的知识，也能继续编辑</span>
-            </div>
-            <h1>让文档与公式，回到可编辑的状态。</h1>
-            <p>接入你自己的模型，识别、核对、修正，再带回 Word 或 Markdown。</p>
+            <h1>识别图片，编辑文字与公式。</h1>
+            <p>上传图片，核对识别结果，再导出 Word 或 Markdown。</p>
           </div>
           <div className="intro-symbol" aria-hidden="true">
             ∫<span>原图 → 稿件</span>
@@ -404,7 +432,13 @@ export function Workspace() {
             ))}
           </ol>
           <div className="process-text" role="status" aria-live="polite">
-            <span>{state.message}</span>
+            <span>
+              {state.status === "error"
+                ? state.action === "review"
+                  ? "复核未完成"
+                  : "识别未完成"
+                : state.message}
+            </span>
             {state.elapsedMs > 0 && (
               <span className="elapsed">
                 {Math.round(state.elapsedMs / 1000)} 秒
@@ -423,13 +457,16 @@ export function Workspace() {
             <div>
               <strong>{state.message}</strong>
               <p>{state.hint}</p>
-              <code>{state.code}</code>
+              <details>
+                <summary>错误详情</summary>
+                <code>{state.code}</code>
+              </details>
             </div>
             <button
               className="button secondary"
-              onClick={() => process("recognize")}
+              onClick={() => process(state.action || "recognize")}
             >
-              重新识别
+              {state.action === "review" ? "重试复核" : "重新识别"}
             </button>
           </div>
         )}
@@ -450,7 +487,7 @@ export function Workspace() {
               onChange={changeFile}
               aria-label="上传图片"
               className="hidden-input"
-              disabled={busy}
+              disabled={locked}
             />
             <div
               className={`image-stage ${dragging ? "dragging" : ""} ${file ? "has-image" : ""}`}
@@ -479,7 +516,7 @@ export function Workspace() {
                   <button
                     className="image-change"
                     onClick={() => fileInput.current?.click()}
-                    disabled={busy}
+                    disabled={locked}
                   >
                     <ImagePlus size={16} />
                     更换图片
@@ -515,26 +552,28 @@ export function Workspace() {
                     <small>{(file.size / 1024).toFixed(0)} KB</small>
                   </>
                 ) : (
-                  <span>先试一张公开示例</span>
+                  <span>
+                    {loadingExample ? "正在加载示例…" : "试用示例图片"}
+                  </span>
                 )}
               </div>
               <div className="sample-buttons">
                 <button
                   onClick={() => void loadExample("document")}
-                  disabled={busy}
+                  disabled={locked}
                 >
                   文档示例
                 </button>
                 <button
                   onClick={() => void loadExample("formula")}
-                  disabled={busy}
+                  disabled={locked}
                 >
                   公式示例
                 </button>
               </div>
             </div>
             <div className="recognition-controls">
-              <fieldset disabled={busy || !!content}>
+              <fieldset disabled={locked || !!content}>
                 <legend>识别范围</legend>
                 <label
                   className={
@@ -567,7 +606,7 @@ export function Workspace() {
               </fieldset>
               <button
                 className="button primary recognize-button"
-                disabled={!file || busy}
+                disabled={!file || locked}
                 onClick={() => process("recognize")}
               >
                 {busy ? (
@@ -644,7 +683,7 @@ export function Workspace() {
               </div>
               <button
                 className="review-button"
-                disabled={!content || !file || busy}
+                disabled={!content.trim() || !file || locked}
                 onClick={() => process("review")}
               >
                 <CheckCheck size={16} />
@@ -689,6 +728,10 @@ export function Workspace() {
                   onChange={(event) => {
                     setContent(event.target.value);
                     setFeedback("");
+                    if (proposal !== null) {
+                      setProposal(null);
+                      finishMessage("稿件已修改，请重新复核或直接导出");
+                    }
                   }}
                   spellCheck={false}
                   placeholder={
@@ -696,7 +739,7 @@ export function Workspace() {
                       ? "输入 Markdown。行内公式使用 $...$，独立公式使用 $$。"
                       : "输入 LaTeX 公式，例如 \\frac{a}{b}"
                   }
-                  disabled={busy}
+                  disabled={busy || exporting}
                 />
                 <span className="editor-count">
                   {content.length.toLocaleString()} 字符
@@ -793,6 +836,7 @@ export function Workspace() {
                 <select
                   aria-label="导出格式"
                   value={format}
+                  disabled={busy || exporting}
                   onChange={(event) => setFormat(event.target.value)}
                 >
                   <option value="docx">Word (.docx)</option>
@@ -807,7 +851,7 @@ export function Workspace() {
                 </select>
                 <button
                   className="button primary"
-                  disabled={!content.trim() || busy || exporting}
+                  disabled={!content.trim() || locked}
                   onClick={() => void download()}
                 >
                   {exporting ? (
@@ -827,11 +871,12 @@ export function Workspace() {
                 </button>
                 <button
                   className="text-button"
-                  disabled={content === original || !original || busy}
+                  disabled={content === original || !original || locked}
                   onClick={() => {
                     if (window.confirm("恢复首次识别稿会替换当前修改。")) {
                       setContent(original);
                       setProposal(null);
+                      setFeedback("已恢复首次识别稿。");
                     }
                   }}
                 >
@@ -867,7 +912,7 @@ export function Workspace() {
             rel="noreferrer"
           >
             <CodeXml size={16} />
-            源代码与部署指南
+            项目与使用说明
           </a>
         </footer>
       </main>
@@ -904,7 +949,6 @@ export function Workspace() {
       >
         <div className="dialog-heading">
           <div>
-            <span className="small-label">对照原图决定是否修改</span>
             <h2 id="proposal-title">复核提案</h2>
           </div>
           <button

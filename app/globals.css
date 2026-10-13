@@ -9,7 +9,7 @@
   --paper: #fff;
   --workspace: #f4f6f9;
   --ink: #18283e;
-  --muted: #6c7788;
+  --muted: #5d6b7e;
   --line: #e2e7ee;
   --blue: #245ce1;
   --blue-dark: #1948bb;
@@ -119,10 +119,6 @@ a svg {
   color: #fff;
   border-radius: 11px;
 }
-.brand-open {
-  color: var(--blue);
-  font-weight: 400;
-}
 .site-header nav {
   display: flex;
   align-items: center;
@@ -180,20 +176,6 @@ main {
   align-items: center;
   margin-bottom: 30px;
 }
-.intro-caption {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 12px;
-}
-.open-tag {
-  color: var(--blue);
-  background: var(--blue-pale);
-  padding: 3px 8px;
-  border-radius: 4px;
-}
 .intro h1 {
   font-size: 32px;
   line-height: 1.45;
@@ -241,7 +223,7 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #7c8797;
+  color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -252,7 +234,7 @@ main {
   height: 23px;
   border-radius: 50%;
   background: #fff;
-  color: #7e8ba0;
+  color: var(--muted);
   font-size: 12px;
 }
 .process-bar li.active {
@@ -418,7 +400,7 @@ main {
 }
 .upload-empty small {
   font-size: 12px;
-  color: #8c97a7;
+  color: var(--muted);
   display: block;
   margin-top: 12px;
 }
@@ -603,7 +585,7 @@ fieldset:disabled .mode-option {
 }
 .result-badge {
   font-size: 12px;
-  color: #8d97a6;
+  color: var(--muted);
   border-radius: 4px;
   padding: 3px 7px;
   background: #f3f5f8;
@@ -818,7 +800,7 @@ fieldset:disabled .mode-option {
   bottom: 8px;
   right: 24px;
   font-size: 12px;
-  color: #94a0b0;
+  color: var(--muted);
   pointer-events: none;
   background: #fff;
 }
@@ -844,7 +826,7 @@ fieldset:disabled .mode-option {
 }
 .check-status small {
   font-size: 12px;
-  color: #8d99aa;
+  color: var(--muted);
 }
 .check-status .warning-text,
 .check-status .warning-text svg {
@@ -919,7 +901,7 @@ fieldset:disabled .mode-option {
 }
 .draft-actions > span {
   margin-left: auto;
-  color: #8f9aaa;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1010,12 +992,6 @@ fieldset:disabled .mode-option {
 }
 .dialog-heading h2 {
   font-size: 24px;
-}
-.small-label {
-  font-size: 12px;
-  color: var(--blue);
-  display: block;
-  margin-bottom: 4px;
 }
 .muted {
   color: var(--muted);
@@ -1305,12 +1281,6 @@ fieldset:disabled .mode-option {
   }
   .intro {
     margin-bottom: 22px;
-  }
-  .intro-caption {
-    gap: 8px;
-    font-size: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
   }
   .intro h1 {
     font-size: 24px;

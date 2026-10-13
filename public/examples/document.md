@@ -17,4 +17,4 @@ $$
 | $x^2$ | $2x$ |
 | $\sin x$ | $\cos x$ |
 
-FormulaFlow Open 公开演示素材
+微积分笔记示例

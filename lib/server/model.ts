@@ -69,12 +69,10 @@ async function requestModel(
   payload: string,
   signal: AbortSignal,
 ) {
-  const addresses = await resolveAddresses(config);
-  if (signal.aborted)
-    throw new AppError("CANCELLED", "处理已取消。", "可以重新开始识别。");
   const timeout = AbortSignal.timeout(config.timeoutMs);
   const combined = AbortSignal.any([signal, timeout]);
   try {
+    const addresses = await resolveAddresses(config, combined);
     return await new Promise<{ status: number; body: string }>(
       (resolve, reject) => {
         const transport = config.endpoint.protocol === "https:" ? https : http;
@@ -126,6 +124,8 @@ async function requestModel(
       },
     );
   } catch (error) {
+    if (signal.aborted)
+      throw new AppError("CANCELLED", "处理已取消。", "可以重新开始识别。");
     if (timeout.aborted)
       throw new AppError(
         "MODEL_TIMEOUT",
@@ -133,8 +133,6 @@ async function requestModel(
         "裁剪图片或增加 MODEL_TIMEOUT_MS 后重试。",
         504,
       );
-    if (signal.aborted)
-      throw new AppError("CANCELLED", "处理已取消。", "可以重新开始识别。");
     if (error instanceof AppError) throw error;
     throw new AppError(
       "MODEL_CONNECTION",
@@ -183,7 +181,9 @@ export async function recognize(
   const result = await requestModel(config, payload, signal);
   let parsed: Payload = {};
   try {
-    parsed = JSON.parse(result.body);
+    const value: unknown = JSON.parse(result.body);
+    if (value && typeof value === "object" && !Array.isArray(value))
+      parsed = value as Payload;
   } catch {
     /* Never expose the upstream body. */
   }
@@ -281,6 +281,13 @@ export async function recognize(
         content = content.slice(start.length, -end.length).trim();
         break;
       }
+  if (!content)
+    throw new AppError(
+      "MODEL_EMPTY",
+      "没有识别到文字或公式。",
+      "确认图片包含清晰内容，或裁剪到目标区域。",
+      422,
+    );
   const count = (n: unknown) =>
     typeof n === "number" && Number.isSafeInteger(n) && n >= 0 ? n : null;
   return {
