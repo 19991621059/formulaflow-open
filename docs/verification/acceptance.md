@@ -36,7 +36,7 @@
 - 12 项黑盒 HTTP 检查通过：上传与阶段顺序、修改预览、当前稿件导出、两种模式、复核提案、错误后重试、无效图片阻止模型调用、无效公式阻止 Word 导出、跨来源拒绝和访问口令。
 - `npm audit --omit=dev`：0 个已报告问题（本次查询结果）。
 - 发布文件的已知凭据模式扫描通过；额外逐一对照原项目已有密钥值，发布源文件和浏览器构建资源没有匹配。
-- Docker 构建与容器导出检查由仓库 GitHub Actions 执行，具体结果以 [Checks](https://github.com/19991621059/formulaflow-open/actions/workflows/ci.yml) 为准。
+- GitHub Actions 在干净的 Ubuntu / Node.js 22 环境中通过安装、凭据检查、依赖审计、类型检查、11 项核心测试、生产构建和 12 项黑盒 HTTP 检查。Docker 镜像构建、容器启动、公开图片访问和原生公式 Word 导出也通过；见 [首次云端检查](https://github.com/19991621059/formulaflow-open/actions/runs/38454560501)。
 
 黑盒 HTTP 测试使用固定结果的本地测试接口，验证流程和协议，不等同于真实 OCR。真实模型结果单独列在上面。
 
