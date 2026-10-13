@@ -1,0 +1,57 @@
+{
+  "name": "formulaflow-open",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted document and formula assistant with your own vision API.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <27"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "node scripts/start.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "node scripts/e2e.mjs",
+    "test:live": "node scripts/live.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "samples": "tsx scripts/create-samples.ts",
+    "format": "prettier --write app components lib scripts tests next.config.ts tsconfig.json package.json compose.yaml .github README.md docs CONTRIBUTING.md SECURITY.md THIRD_PARTY_NOTICES.md",
+    "format:check": "prettier --check app components lib scripts tests next.config.ts tsconfig.json package.json compose.yaml .github README.md docs CONTRIBUTING.md SECURITY.md THIRD_PARTY_NOTICES.md"
+  },
+  "dependencies": {
+    "docx": "9.7.1",
+    "hast-util-to-html": "9.0.5",
+    "lucide-react": "^1.41.0",
+    "mathjax-full": "^3.2.2",
+    "mathml2omml": "0.5.0",
+    "next": "16.4.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "rehype-raw": "7.0.0",
+    "rehype-sanitize": "6.0.0",
+    "remark-gfm": "4.0.1",
+    "remark-math": "6.0.0",
+    "remark-parse": "11.0.0",
+    "remark-rehype": "11.1.2",
+    "sharp": "0.35.5",
+    "unified": "11.0.5",
+    "xml-js": "1.6.11"
+  },
+  "devDependencies": {
+    "@types/hast": "3.0.4",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "jszip": "3.10.1",
+    "prettier": "3.9.10",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "0.9.12",
+    "katex": "0.18.2"
+  }
+}

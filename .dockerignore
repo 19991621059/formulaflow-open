@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.env*
+outputs
+test-results
+docs/images
+prompt-history.md
+AGENTS.md
+*.log

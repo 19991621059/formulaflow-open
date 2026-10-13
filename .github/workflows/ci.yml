@@ -1,0 +1,36 @@
+name: Checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:secrets
+      - run: npm audit --omit=dev --audit-level=moderate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+      - run: npm run test:e2e
+      - name: Build and check standalone container
+        run: |
+          docker build -t formulaflow-open:ci .
+          docker run -d --name formulaflow -p 127.0.0.1:3030:3000 formulaflow-open:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3030/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3030/examples/document.png > /tmp/sample.png
+          curl --fail --silent -H 'Content-Type: application/json' -d '{"content":"x^2","mode":"formula","format":"docx"}' http://127.0.0.1:3030/api/export > /tmp/formula.docx
+          unzip -p /tmp/formula.docx word/document.xml | grep -q '<m:oMath'

@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+outputs/
+test-results/
+coverage/
+*.log
+prompt-history.md
+AGENTS.md
+*.pem
+*.key
